@@ -1,4 +1,4 @@
-# 🚀 Smart Ticketing — Next-Gen AI Support Ecosystem
+# 🚀 Sahayak AI — Next-Gen AI Support Ecosystem
 
 <div align="center">
 

@@ -253,7 +253,7 @@ The web application is engineered for multi-device perfection across laptops, ta
    Create `apps/api/.env`:
 
    ```env
-   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ai_ticketing?schema=public"
+   DATABASE_URL="Your Pg sql String"
    PORT=4000
    SESSION_SECRET="your-super-secret-random-key"
    WEB_ORIGIN="http://localhost:5173"

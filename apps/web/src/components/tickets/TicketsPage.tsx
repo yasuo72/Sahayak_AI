@@ -550,7 +550,7 @@ export function TicketsPage({
                           className="flex items-center gap-1 h-6 rounded-md border border-indigo-300 bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
                           title="Adopt AI-calculated autoPriority"
                         >
-                          ⚡ Apply AI ({selected.autoPriority})
+                          ⚡ Apply AI Priority ({selected.autoPriority})
                         </button>
                       )}
                     {isStaff && (
@@ -588,7 +588,7 @@ export function TicketsPage({
                           className="flex items-center gap-1 h-6 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                         >
                           <UserCog className="size-3" />
-                          Assign
+                          Assign to me
                         </button>
                       </>
                     )}
@@ -941,7 +941,7 @@ export function TicketsPage({
                             className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-40 cursor-pointer"
                           >
                             <Wand2 className={`size-3 ${isPolishing ? 'animate-spin' : ''}`} />
-                            {isPolishing ? 'Polishing...' : 'Polish'}
+                            {isPolishing ? 'Polishing...' : 'Polish with AI'}
                           </button>
                         )}
                         <button

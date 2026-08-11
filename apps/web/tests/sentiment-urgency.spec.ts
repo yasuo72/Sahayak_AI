@@ -90,7 +90,7 @@ test('inbound angry ticket auto-scores to URGENT with mood indicator and AI reas
     page.getByTestId('ticket-detail').getByText('Flagged URGENT: angry tone').first(),
   ).toBeVisible();
 
-  // Verify agent can adopt AI Priority
+  // Verify agent can adopt AI Priority via the button (since priority=MEDIUM and autoPriority=URGENT)
   await page.getByRole('button', { name: 'Apply AI Priority (URGENT)' }).click();
   await expect(
     page.getByTestId('ticket-detail').locator('select').filter({ hasText: 'URGENT' }).first(),

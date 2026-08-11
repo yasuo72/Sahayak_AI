@@ -12,7 +12,7 @@
     "prisma": "prisma",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:deploy": "sh ./scripts/prisma-env.sh",
+    "db:deploy": "node ./scripts/run-prisma-migrate.mjs",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
   },

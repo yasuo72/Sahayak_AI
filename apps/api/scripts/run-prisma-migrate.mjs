@@ -61,10 +61,15 @@ if (resolved) {
 }
 
 const prismaCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const result = spawnSync(prismaCommand, ['prisma', 'migrate', 'deploy'], {
-  cwd: rootDir,
-  stdio: 'inherit',
-  env,
-});
+const result = spawnSync(
+  prismaCommand,
+  ['prisma', 'db', 'push', '--schema=prisma/schema.prisma', '--accept-data-loss'],
+  {
+    cwd: rootDir,
+    stdio: 'inherit',
+    env,
+    shell: true,
+  },
+);
 
 process.exit(result.status ?? 1);

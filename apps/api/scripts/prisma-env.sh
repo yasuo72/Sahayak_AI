@@ -21,5 +21,5 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 1
 fi
 
-echo "Applying database migrations..."
-exec npx prisma migrate deploy
+echo "Applying database schema..."
+exec npx prisma db push --accept-data-loss

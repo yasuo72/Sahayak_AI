@@ -429,9 +429,7 @@ export function TicketsPage({
                                       ? '😊'
                                       : '😐'}
                             </span>
-                            <span className="hidden sm:inline text-[10px]">
-                              {ticket.sentiment}
-                            </span>
+                            <span className="hidden sm:inline text-[10px]">{ticket.sentiment}</span>
                           </span>
                         )}
                         <PriorityBadge priority={ticket.priority} />
@@ -517,11 +515,12 @@ export function TicketsPage({
                                     : '😐'}
                           </span>
                           <span>{selected.sentiment}</span>
-                          {selected.sentimentScore !== null && selected.sentimentScore !== undefined && (
-                            <span className="text-[10px] text-slate-500">
-                              ({selected.sentimentScore.toFixed(2)})
-                            </span>
-                          )}
+                          {selected.sentimentScore !== null &&
+                            selected.sentimentScore !== undefined && (
+                              <span className="text-[10px] text-slate-500">
+                                ({selected.sentimentScore.toFixed(2)})
+                              </span>
+                            )}
                         </span>
                       )}
                       {selected.category && (
@@ -540,22 +539,28 @@ export function TicketsPage({
 
                   {/* Staff controls & Fullscreen toggle */}
                   <div className="flex flex-wrap items-center gap-1.5 shrink-0 ml-auto">
-                    {isStaff && selected.autoPriority && selected.autoPriority !== selected.priority && (
-                      <button
-                        type="button"
-                        onClick={() => void updateTicket(selected.id, { priority: selected.autoPriority! })}
-                        className="flex items-center gap-1 h-6 rounded-md border border-indigo-300 bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
-                        title="Adopt AI-calculated autoPriority"
-                      >
-                        ⚡ Apply AI ({selected.autoPriority})
-                      </button>
-                    )}
+                    {isStaff &&
+                      selected.autoPriority &&
+                      selected.autoPriority !== selected.priority && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void updateTicket(selected.id, { priority: selected.autoPriority! })
+                          }
+                          className="flex items-center gap-1 h-6 rounded-md border border-indigo-300 bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                          title="Adopt AI-calculated autoPriority"
+                        >
+                          ⚡ Apply AI ({selected.autoPriority})
+                        </button>
+                      )}
                     {isStaff && (
                       <>
                         <select
                           value={selected.status}
                           onChange={(e) =>
-                            void updateTicket(selected.id, { status: e.target.value as TicketStatus })
+                            void updateTicket(selected.id, {
+                              status: e.target.value as TicketStatus,
+                            })
                           }
                           className="h-6 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-indigo-400 cursor-pointer"
                         >
@@ -598,8 +603,14 @@ export function TicketsPage({
                       )}
                       title={isFullScreen ? 'Exit Fullscreen' : 'Fullscreen Chat Mode'}
                     >
-                      {isFullScreen ? <Minimize2 className="size-3" /> : <Maximize2 className="size-3" />}
-                      <span className="hidden sm:inline">{isFullScreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+                      {isFullScreen ? (
+                        <Minimize2 className="size-3" />
+                      ) : (
+                        <Maximize2 className="size-3" />
+                      )}
+                      <span className="hidden sm:inline">
+                        {isFullScreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -624,7 +635,9 @@ export function TicketsPage({
                 {selected.aiReasoning && (
                   <div className="rounded-md border border-indigo-200/90 bg-indigo-50/80 px-2.5 py-1 text-[11px] text-indigo-950 flex items-center gap-1.5">
                     <Bot className="size-3 text-indigo-600 shrink-0" />
-                    <span className="font-semibold text-indigo-900 shrink-0">AI Priority Reasoning:</span>
+                    <span className="font-semibold text-indigo-900 shrink-0">
+                      AI Priority Reasoning:
+                    </span>
                     <span className="truncate">{selected.aiReasoning}</span>
                   </div>
                 )}
@@ -739,15 +752,16 @@ export function TicketsPage({
                 {selected.replies.map((reply, index) => {
                   const isCustomer = reply.author.role === 'CUSTOMER';
                   const isSenderChange =
-                    index === 0 ||
-                    selected.replies[index - 1].author.id !== reply.author.id;
+                    index === 0 || selected.replies[index - 1].author.id !== reply.author.id;
 
                   return (
                     <article
                       key={reply.id}
                       className={cn(
                         'flex gap-2 animate-fade-in my-0.5',
-                        isCustomer ? 'items-start justify-start' : 'items-start justify-end ml-auto',
+                        isCustomer
+                          ? 'items-start justify-start'
+                          : 'items-start justify-end ml-auto',
                         isSenderChange ? 'mt-2.5' : 'mt-1',
                       )}
                     >
@@ -774,10 +788,10 @@ export function TicketsPage({
                             isCustomer ? 'justify-start text-left' : 'justify-end text-right',
                           )}
                         >
-                          <span className="font-semibold text-slate-700">
-                            {reply.author.name}
+                          <span className="font-semibold text-slate-700">{reply.author.name}</span>
+                          <span className="text-slate-400 text-[10px]">
+                            ({reply.author.role.toLowerCase()})
                           </span>
-                          <span className="text-slate-400 text-[10px]">({reply.author.role.toLowerCase()})</span>
                           {reply.isInternal && (
                             <span className="rounded-full border border-amber-200 bg-amber-50 px-1 py-0.1 text-[9px] font-semibold text-amber-700">
                               Internal
@@ -888,7 +902,9 @@ export function TicketsPage({
                             Use this →
                           </button>
                         </div>
-                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{polishedReply}</p>
+                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                          {polishedReply}
+                        </p>
                       </div>
                     )}
 
@@ -910,7 +926,9 @@ export function TicketsPage({
                                 )}
                               />
                             </div>
-                            <span className="text-[11px] font-semibold text-slate-600">Internal note</span>
+                            <span className="text-[11px] font-semibold text-slate-600">
+                              Internal note
+                            </span>
                           </label>
                         )}
                       </div>

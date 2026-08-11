@@ -200,10 +200,11 @@ export function LoginPage({ onLogin }: Props) {
                     setMode(m);
                     setError('');
                   }}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition cursor-pointer ${mode === m
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                    }`}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition cursor-pointer ${
+                    mode === m
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
                 >
                   {m === 'login' ? (
                     <LogIn className="size-3.5" />
@@ -300,7 +301,8 @@ export function LoginPage({ onLogin }: Props) {
               <p className="text-xs font-semibold text-slate-600 mb-1.5">Demo accounts</p>
               <div className="space-y-0.5 text-xs text-slate-500">
                 <p>
-                  <span className="font-mono text-slate-700">rohitsingh971451@gmail.com</span> — Admin
+                  <span className="font-mono text-slate-700">rohitsingh971451@gmail.com</span> —
+                  Admin
                 </p>
                 <p>
                   <span className="font-mono text-slate-700">agent@aiticketing.local</span> — Agent

@@ -102,7 +102,8 @@ export function calculateAutoPriority(params: ScoreTicketParams): PriorityScoreR
 
   // 4. Category-Specific Risk Matrix
   const normalizedCategory = (category || 'General').trim();
-  const isNegative = sentiment === Sentiment.ANGRY || sentiment === Sentiment.FRUSTRATED || sentimentScore < -0.2;
+  const isNegative =
+    sentiment === Sentiment.ANGRY || sentiment === Sentiment.FRUSTRATED || sentimentScore < -0.2;
 
   if (isNegative && normalizedCategory === 'Billing') {
     totalScore += 25;
@@ -130,7 +131,9 @@ export function calculateAutoPriority(params: ScoreTicketParams): PriorityScoreR
       if (scoreDrop >= 0.4 || totalDrop >= 0.5 || (isNegative && prevScore < -0.2)) {
         isEscalating = true;
         totalScore += 30;
-        reasoningParts.push(`escalating thread tone (${prevScore.toFixed(2)} → ${sentimentScore.toFixed(2)})`);
+        reasoningParts.push(
+          `escalating thread tone (${prevScore.toFixed(2)} → ${sentimentScore.toFixed(2)})`,
+        );
       }
     }
   }

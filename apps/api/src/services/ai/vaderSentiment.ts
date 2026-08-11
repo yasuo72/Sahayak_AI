@@ -82,7 +82,8 @@ export function analyzeWithVader(text: string): VaderAnalysis {
   // This is the "dominant anger" heuristic for customer support.
   const hasStrongNegative = mostNegative.scores.compound <= -0.4;
   const negativeRatio =
-    sentenceScores.filter((s) => s.scores.compound <= -0.2).length / Math.max(sentenceScores.length, 1);
+    sentenceScores.filter((s) => s.scores.compound <= -0.2).length /
+    Math.max(sentenceScores.length, 1);
 
   let effectiveScores: VaderScores;
 

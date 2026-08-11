@@ -3,7 +3,7 @@ import { analyzeWithVader, reconcileSentiment } from './vaderSentiment.js';
 import { Sentiment } from '../../generated/prisma/client.js';
 
 describe('VADER Sentiment Analysis', () => {
-  it('detects angry sentiment in Alex\'s cracked phone email (sentence-level)', () => {
+  it("detects angry sentiment in Alex's cracked phone email (sentence-level)", () => {
     const text = `Hello Support Team,
 I am extremely upset. I ordered a new phone last week. It arrived today,
 but the screen is completely cracked. This is the worst service ever! I
@@ -22,7 +22,8 @@ mess. Please fix this fast.`;
   });
 
   it('detects clearly positive sentiment', () => {
-    const text = 'I absolutely love your product! Great customer service, very helpful team. Thank you so much!';
+    const text =
+      'I absolutely love your product! Great customer service, very helpful team. Thank you so much!';
     const result = analyzeWithVader(text);
 
     expect(result.sentimentScore).toBeGreaterThan(0.3);
@@ -55,7 +56,8 @@ mess. Please fix this fast.`;
   });
 
   it('detects frustrated tone from repeated issues', () => {
-    const text = 'I have contacted support three times about this issue. Each time I am told it will be fixed but nothing changes. I am getting tired of this.';
+    const text =
+      'I have contacted support three times about this issue. Each time I am told it will be fixed but nothing changes. I am getting tired of this.';
     const result = analyzeWithVader(text);
 
     expect(result.sentimentScore).toBeLessThan(0);

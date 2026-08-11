@@ -34,7 +34,9 @@ test.afterAll(async () => {
   await client.end();
 });
 
-test('inbound angry ticket auto-scores to URGENT with mood indicator and AI reasoning string', async ({ page }) => {
+test('inbound angry ticket auto-scores to URGENT with mood indicator and AI reasoning string', async ({
+  page,
+}) => {
   const customerEmail = `${testRunId}-angry-customer@test.local`;
   const agentEmail = `${testRunId}-agent@test.local`;
   const subject = `${testRunId} UNACCEPTABLE: Service down and refund requested`;
@@ -81,15 +83,26 @@ test('inbound angry ticket auto-scores to URGENT with mood indicator and AI reas
   // Verify Ticket Detail displays Angry mood, Enterprise tier badge, and AI reasoning banner
   await expect(page.getByTestId('ticket-detail').getByText('ANGRY').first()).toBeVisible();
   await expect(page.getByTestId('ticket-detail').getByText('ENTERPRISE').first()).toBeVisible();
-  await expect(page.getByTestId('ticket-detail').getByText('AI Priority Reasoning:').first()).toBeVisible();
-  await expect(page.getByTestId('ticket-detail').getByText('Flagged URGENT: angry tone').first()).toBeVisible();
+  await expect(
+    page.getByTestId('ticket-detail').getByText('AI Priority Reasoning:').first(),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId('ticket-detail').getByText('Flagged URGENT: angry tone').first(),
+  ).toBeVisible();
 
   // Verify agent can adopt AI Priority
   await page.getByRole('button', { name: 'Apply AI Priority (URGENT)' }).click();
-  await expect(page.getByTestId('ticket-detail').locator('select').filter({ hasText: 'URGENT' }).first()).toHaveValue('URGENT');
+  await expect(
+    page.getByTestId('ticket-detail').locator('select').filter({ hasText: 'URGENT' }).first(),
+  ).toHaveValue('URGENT');
 });
 
-async function createUser(email: string, name: string, role: 'CUSTOMER' | 'AGENT' | 'ADMIN', tier: 'STANDARD' | 'PRO' | 'ENTERPRISE') {
+async function createUser(
+  email: string,
+  name: string,
+  role: 'CUSTOMER' | 'AGENT' | 'ADMIN',
+  tier: 'STANDARD' | 'PRO' | 'ENTERPRISE',
+) {
   const passwordHash = await bcrypt.hash('Password123!', 12);
   const id = `${testRunId}-${role.toLowerCase()}-${Math.random().toString(36).slice(2)}`;
 

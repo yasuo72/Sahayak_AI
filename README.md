@@ -25,10 +25,10 @@
 
 **Smart Ticketing** is a full-stack AI-powered customer support platform built as a monorepo with two apps:
 
-| Component | Stack | Purpose |
-|-----------|-------|---------|
-| **`apps/web`** | React 19 + Vite + Tailwind CSS v4 | Customer portal & Agent workspace UI |
-| **`apps/api`** | Node.js + Express + Prisma + PostgreSQL | REST API, AI engine, email webhooks |
+| Component      | Stack                                   | Purpose                              |
+| -------------- | --------------------------------------- | ------------------------------------ |
+| **`apps/web`** | React 19 + Vite + Tailwind CSS v4       | Customer portal & Agent workspace UI |
+| **`apps/api`** | Node.js + Express + Prisma + PostgreSQL | REST API, AI engine, email webhooks  |
 
 ### What It Does (30-Second Summary)
 
@@ -175,12 +175,12 @@ The heart of Smart Ticketing's intelligence is a **3-layer analysis pipeline** t
 
 > _"I am extremely upset. The screen is cracked. This is the worst service ever! ... On a side note, your chat agent was very kind and polite."_
 
-| Layer | Result |
-|-------|--------|
-| **LLM (without VADER)** | Could classify as NEUTRAL (-0.1) — diluted by polite side-note |
-| **VADER sentence-level** | Finds `"worst service ever!"` at compound -0.73 → ANGRY |
-| **reconcileSentiment()** | VADER overrides → **ANGRY (-0.73)** |
-| **Priority Scoring** | ANGRY(+40) + 5 keywords(+45) = 85 → **URGENT** ⚡ |
+| Layer                    | Result                                                         |
+| ------------------------ | -------------------------------------------------------------- |
+| **LLM (without VADER)**  | Could classify as NEUTRAL (-0.1) — diluted by polite side-note |
+| **VADER sentence-level** | Finds `"worst service ever!"` at compound -0.73 → ANGRY        |
+| **reconcileSentiment()** | VADER overrides → **ANGRY (-0.73)**                            |
+| **Priority Scoring**     | ANGRY(+40) + 5 keywords(+45) = 85 → **URGENT** ⚡              |
 
 ---
 
@@ -194,17 +194,17 @@ The heart of Smart Ticketing's intelligence is a **3-layer analysis pipeline** t
 
 ## 🌟 Highlights & Core Capabilities
 
-| Feature                         | Technical Implementation                                                                                                        | Non-Tech Explanation                                                       |
-| :------------------------------ | :------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------- |
-| **🤖 AI Auto-Pilot**            | Analyzes sentiment, categorizes tickets, generates summaries, and auto-resolves simple support requests using Groq / Llama 3.3. | Saves 80% of routine customer support time automatically.                  |
-| **😠 Dual-Layer Sentiment AI**  | LLM sentiment analysis validated by VADER NLP (sentence-level decomposition, "most-negative-wins" reconciliation).              | Catches angry customers even when they include polite side-notes.          |
-| **🚨 Smart Priority Scoring**   | Multi-factor engine: sentiment severity + urgency keywords + customer tier + category risk matrix + thread escalation trend.     | Angry customer + billing issue = auto-escalate to URGENT.                  |
-| **📧 Two-Way Email Sync**       | Webhook integration with Resend API for automatic inbound ticket creation and outbound email notifications.                     | Customers use email as usual; support staff use a unified web dashboard.   |
-| **🪄 1-Click AI Polisher**      | Converts informal agent notes into empathetic, professionally worded customer responses via AI prompt engineering.               | No typos or awkward phrasing—always crisp, professional support.           |
-| **🖥️ Fullscreen Focus Mode**   | Toggle button expands ticket detail/chat to 100% workspace width, hiding the ticket list sidebar.                               | Agents can focus on a single conversation without distractions.            |
-| **🌙 Dark Mode**                | Full dark theme with CSS attribute selectors handling Tailwind opacity variants and tinted badge backgrounds.                    | Easy on the eyes for night shifts and late-night support work.             |
-| **📱 Mobile-First UI**          | Custom responsive sliding drawers, mobile hamburger menus, and seamless single-pane detail views.                               | Works flawlessly on iPhones, Android devices, tablets, and desktops.       |
-| **⚡ Shimmer Skeletons**        | Smooth loading states with custom animated skeleton UI placeholders preventing layout shift.                                    | Zero layout shifts or blank screens while data is loading.                 |
+| Feature                        | Technical Implementation                                                                                                        | Non-Tech Explanation                                                           |
+| :----------------------------- | :------------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------- |
+| **🤖 AI Auto-Pilot**           | Analyzes sentiment, categorizes tickets, generates summaries, and auto-resolves simple support requests using Groq / Llama 3.3. | Saves 80% of routine customer support time automatically.                      |
+| **😠 Dual-Layer Sentiment AI** | LLM sentiment analysis validated by VADER NLP (sentence-level decomposition, "most-negative-wins" reconciliation).              | Catches angry customers even when they include polite side-notes.              |
+| **🚨 Smart Priority Scoring**  | Multi-factor engine: sentiment severity + urgency keywords + customer tier + category risk matrix + thread escalation trend.    | Angry customer + billing issue = auto-escalate to URGENT.                      |
+| **📧 Two-Way Email Sync**      | Webhook integration with Resend API for automatic inbound ticket creation and outbound email notifications.                     | Customers use email as usual; support staff use a unified web dashboard.       |
+| **🪄 1-Click AI Polisher**     | Converts informal agent notes into empathetic, professionally worded customer responses via AI prompt engineering.              | No typos or awkward phrasing—always crisp, professional support.               |
+| **🖥️ Fullscreen Focus Mode**   | Toggle button expands ticket detail/chat to 100% workspace width, hiding the ticket list sidebar.                               | Agents can focus on a single conversation without distractions.                |
+| **🌙 Dark Mode**               | Full dark theme with CSS attribute selectors handling Tailwind opacity variants and tinted badge backgrounds.                   | Easy on the eyes for night shifts and late-night support work.                 |
+| **📱 Mobile-First UI**         | Custom responsive sliding drawers, mobile hamburger menus, and seamless single-pane detail views.                               | Works flawlessly on iPhones, Android devices, tablets, and desktops.           |
+| **⚡ Shimmer Skeletons**       | Smooth loading states with custom animated skeleton UI placeholders preventing layout shift.                                    | Zero layout shifts or blank screens while data is loading.                     |
 | **🛡️ Role-Based Security**     | Multi-tenant authorization (Customer, Agent, Admin) with audit logs and secure HTTP-only cookies.                               | Ensures customers only see their own tickets while staff manage the workspace. |
 
 ---
@@ -427,16 +427,16 @@ The web application is engineered for multi-device perfection across laptops, ta
 
 ### Test Files
 
-| File | Tests | Coverage |
-|------|-------|----------|
-| `auth.test.ts` | 8 | Signup, login, logout, role guards, inactive users |
-| `tickets.test.ts` | 8 | CRUD, assignment, workflow, filters, AI enrichment, polish |
-| `email.test.ts` | 5 | Inbound webhooks, reply threading, Resend/Sender formats |
-| `adminUsers.test.ts` | 6 | User listing, search, update, deactivation |
-| `dashboard.test.ts` | 3 | Auth guards, metrics, analytics |
-| `sentimentScoring.test.ts` | 4 | Priority scoring factors and edge cases |
-| `vaderSentiment.test.ts` | 9 | Sentence-level analysis, ALL CAPS, negation, LLM/VADER reconciliation |
-| `app.test.ts` | 1 | Server health check |
+| File                       | Tests | Coverage                                                              |
+| -------------------------- | ----- | --------------------------------------------------------------------- |
+| `auth.test.ts`             | 8     | Signup, login, logout, role guards, inactive users                    |
+| `tickets.test.ts`          | 8     | CRUD, assignment, workflow, filters, AI enrichment, polish            |
+| `email.test.ts`            | 5     | Inbound webhooks, reply threading, Resend/Sender formats              |
+| `adminUsers.test.ts`       | 6     | User listing, search, update, deactivation                            |
+| `dashboard.test.ts`        | 3     | Auth guards, metrics, analytics                                       |
+| `sentimentScoring.test.ts` | 4     | Priority scoring factors and edge cases                               |
+| `vaderSentiment.test.ts`   | 9     | Sentence-level analysis, ALL CAPS, negation, LLM/VADER reconciliation |
+| `app.test.ts`              | 1     | Server health check                                                   |
 
 ---
 

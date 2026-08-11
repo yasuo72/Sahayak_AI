@@ -12,7 +12,11 @@ import {
 } from '../generated/prisma/client.js';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
-import { analyzeTicketWithAi, enrichTicketWithAi, ensureAiAssistantUser } from '../services/ai/ticketAi.js';
+import {
+  analyzeTicketWithAi,
+  enrichTicketWithAi,
+  ensureAiAssistantUser,
+} from '../services/ai/ticketAi.js';
 import { calculateAutoPriority } from '../services/ai/sentimentScoring.js';
 import { sendEmail } from '../services/email/emailService.js';
 

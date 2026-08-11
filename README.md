@@ -9,14 +9,43 @@
   <img src="https://img.shields.io/badge/Backend-Railway%20%7C%20Node.js%20%7C%20Express-purple?style=for-the-badge&logo=railway" alt="Backend" />
   <img src="https://img.shields.io/badge/Database-PostgreSQL%20%7C%20Prisma%20ORM-336791?style=for-the-badge&logo=postgresql" alt="Database" />
   <img src="https://img.shields.io/badge/AI%20Engine-LLM%20%7C%20Groq%20%7C%20Llama%203.3-orange?style=for-the-badge&logo=openai" alt="AI Engine" />
+  <img src="https://img.shields.io/badge/NLP-VADER%20Sentiment-red?style=for-the-badge&logo=python" alt="NLP" />
   <img src="https://img.shields.io/badge/Email-Resend%20API-black?style=for-the-badge&logo=resend" alt="Email" />
 
   <p align="center">
     <b>A high-performance, autonomous, AI-driven customer support and ticket management system.</b><br />
-    Designed for lightning-fast resolution, real-time analytics, two-way email synchronization, and mobile-first responsiveness.
+    Designed for lightning-fast resolution, real-time analytics, AI sentiment analysis, two-way email synchronization, and mobile-first responsiveness.
   </p>
 
 </div>
+
+---
+
+## 📖 Quick Project Summary
+
+**Smart Ticketing** is a full-stack AI-powered customer support platform built as a monorepo with two apps:
+
+| Component | Stack | Purpose |
+|-----------|-------|---------|
+| **`apps/web`** | React 19 + Vite + Tailwind CSS v4 | Customer portal & Agent workspace UI |
+| **`apps/api`** | Node.js + Express + Prisma + PostgreSQL | REST API, AI engine, email webhooks |
+
+### What It Does (30-Second Summary)
+
+1. **Customers** submit support tickets via the web portal or by sending an email.
+2. **AI (Groq/Llama 3.3)** instantly analyzes the ticket — categorizes it, writes a summary, generates an auto-reply, and performs **sentiment analysis** to detect customer emotion.
+3. **VADER NLP** (local, zero-cost) validates the AI's sentiment classification sentence-by-sentence, preventing the LLM from being "too polite" on mixed-emotion emails.
+4. A **multi-factor priority scoring engine** combines sentiment severity + urgency keywords + customer tier + category risk to auto-assign priority (LOW → URGENT).
+5. **Support agents** view tickets in a real-time workspace with chat threads, internal notes, AI reply polishing, and fullscreen focus mode.
+6. **Two-way email sync**: customer email replies appear in the agent workspace; agent replies are delivered back via email.
+
+### Key Numbers
+
+- **44 unit/integration tests** passing (Vitest) + Playwright E2E suite
+- **3-layer AI pipeline**: LLM → VADER → Priority Scoring
+- **~2ms** local VADER analysis per ticket (zero API cost)
+- **5 sentiment classes**: ANGRY, FRUSTRATED, NEUTRAL, CONFUSED, POSITIVE
+- **4 priority levels**: LOW, MEDIUM, HIGH, URGENT
 
 ---
 
@@ -82,9 +111,76 @@ Imagine having a **super-intelligent, 24/7 digital support agent** on your team 
 When a customer submits a problem—either through the web portal or by simply sending an email—**Smart Ticketing** instantly gets to work:
 
 1. 🔍 **Understands the Problem**: It reads the message, categorizes the issue (e.g., _Billing_, _Technical_, _Account_), and assesses urgency.
-2. 🤖 **Solves Common Issues Instantly**: If a user asks a routine question (like how to reset a password), the AI auto-resolves the ticket immediately with clear, friendly instructions.
-3. 🪄 **Empowers Support Staff**: For complex issues requiring human agents, the AI generates instant summaries and even rewrites rough agent notes into polished, professional replies with 1 click.
-4. 📬 **Seamless Email Sync**: Customers can reply to support emails directly from Gmail, Outlook, or Apple Mail, and their messages appear instantly inside the agent's web ticket chat.
+2. 😠 **Reads Emotional Tone**: Using a dual-layer AI + NLP sentiment engine, it detects whether the customer is _angry_, _frustrated_, _confused_, or _positive_ — even in mixed-emotion emails with polite side-notes.
+3. 🤖 **Solves Common Issues Instantly**: If a user asks a routine question (like how to reset a password), the AI auto-resolves the ticket immediately with clear, friendly instructions.
+4. 🪄 **Empowers Support Staff**: For complex issues requiring human agents, the AI generates instant summaries and even rewrites rough agent notes into polished, professional replies with 1 click.
+5. 📬 **Seamless Email Sync**: Customers can reply to support emails directly from Gmail, Outlook, or Apple Mail, and their messages appear instantly inside the agent's web ticket chat.
+6. 🚨 **Smart Priority Escalation**: Combines sentiment severity + urgency keywords + customer tier + category-specific risk to auto-flag tickets as HIGH or URGENT when intervention is needed.
+
+---
+
+## 🧠 AI Sentiment Analysis & Priority Scoring Pipeline
+
+The heart of Smart Ticketing's intelligence is a **3-layer analysis pipeline** that processes every ticket:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Customer Email / Ticket                           │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Layer 1: LLM Analysis (Groq / Llama 3.3)              ~1-3s       │
+│  ─────────────────────────────────────────────                      │
+│  • Category classification (Billing/Technical/Account/General)      │
+│  • 1-2 sentence summary for agent queue                             │
+│  • Sentiment label (ANGRY/FRUSTRATED/NEUTRAL/CONFUSED/POSITIVE)     │
+│  • Sentiment score (-1.0 to +1.0)                                   │
+│  • Urgency keyword extraction                                       │
+│  • Auto-reply generation                                            │
+│  • Auto-resolvable detection (e.g. password reset)                  │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Layer 2: VADER NLP Validation (Local)                  ~2ms       │
+│  ─────────────────────────────────────────                          │
+│  • Sentence-by-sentence decomposition                               │
+│  • "Most-Negative-Wins" heuristic — prevents compliment dilution    │
+│  • Handles: ALL CAPS, punctuation (!!!), negation, degree modifiers │
+│  • reconcileSentiment(): if VADER detects stronger anger than       │
+│    the LLM, VADER overrides; otherwise trusts the LLM              │
+│  • Zero API cost, runs entirely locally via vader-sentiment npm     │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Layer 3: Multi-Factor Priority Scoring Engine                      │
+│  ─────────────────────────────────────────                          │
+│  Factor breakdown:                                                  │
+│  • Sentiment severity:     ANGRY +40 | FRUSTRATED +20 | CONFUSED +10│
+│  • Urgency keywords:       Up to +45 (20 per keyword, capped)       │
+│  • Customer tier:          ENTERPRISE +25 | PRO +15                 │
+│  • Category risk matrix:   Neg + Billing = +25 (refund/churn risk)  │
+│                            Neg + Technical = +20 (failure risk)     │
+│  • Thread escalation:      Worsening sentiment trend = +30          │
+│  ─────────────────────────────────────────                          │
+│  Score → Priority mapping:                                          │
+│  • 0-24  → LOW    │  25-44 → MEDIUM                                │
+│  • 45-64 → HIGH   │  65+   → URGENT                                │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Example: Mixed-Sentiment Email
+
+> _"I am extremely upset. The screen is cracked. This is the worst service ever! ... On a side note, your chat agent was very kind and polite."_
+
+| Layer | Result |
+|-------|--------|
+| **LLM (without VADER)** | Could classify as NEUTRAL (-0.1) — diluted by polite side-note |
+| **VADER sentence-level** | Finds `"worst service ever!"` at compound -0.73 → ANGRY |
+| **reconcileSentiment()** | VADER overrides → **ANGRY (-0.73)** |
+| **Priority Scoring** | ANGRY(+40) + 5 keywords(+45) = 85 → **URGENT** ⚡ |
 
 ---
 
@@ -98,14 +194,18 @@ When a customer submits a problem—either through the web portal or by simply s
 
 ## 🌟 Highlights & Core Capabilities
 
-| Feature                    | Technical Implementation                                                                                                            | Non-Tech Explanation                                                           |
-| :------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------- |
-| **🤖 AI Auto-Pilot**       | Analyzes sentiment, categorizes tickets, generates summaries, and auto-resolves simple support requests using Groq / Llama 3.3.     | Saves 80% of routine customer support time automatically.                      |
-| **📧 Two-Way Email Sync**  | Webhook integration with Resend API for automatic inbound ticket creation and outbound email notifications.                         | Customers use email as usual; support staff use a unified web dashboard.       |
-| **🪄 1-Click AI Polisher** | Converts informal agent notes or draft answers into empathetic, professionally worded customer responses via AI prompt engineering. | No typos or awkward phrasing—always crisp, professional support.               |
-| **📱 Mobile-First UI**     | Custom responsive sliding drawers, mobile hamburger menus, and seamless single-pane detail views.                                   | Works flawlessly on iPhones, Android devices, tablets, and desktops.           |
-| **⚡ Shimmer Skeletons**   | Smooth loading states with custom animated skeleton UI placeholders preventing layout shift.                                        | Zero layout shifts or blank screens while data is loading.                     |
-| **🛡️ Role-Based Security** | Multi-tenant authorization (Customer, Agent, Admin) with audit logs and secure HTTP-only cookies.                                   | Ensures customers only see their own tickets while staff manage the workspace. |
+| Feature                         | Technical Implementation                                                                                                        | Non-Tech Explanation                                                       |
+| :------------------------------ | :------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------- |
+| **🤖 AI Auto-Pilot**            | Analyzes sentiment, categorizes tickets, generates summaries, and auto-resolves simple support requests using Groq / Llama 3.3. | Saves 80% of routine customer support time automatically.                  |
+| **😠 Dual-Layer Sentiment AI**  | LLM sentiment analysis validated by VADER NLP (sentence-level decomposition, "most-negative-wins" reconciliation).              | Catches angry customers even when they include polite side-notes.          |
+| **🚨 Smart Priority Scoring**   | Multi-factor engine: sentiment severity + urgency keywords + customer tier + category risk matrix + thread escalation trend.     | Angry customer + billing issue = auto-escalate to URGENT.                  |
+| **📧 Two-Way Email Sync**       | Webhook integration with Resend API for automatic inbound ticket creation and outbound email notifications.                     | Customers use email as usual; support staff use a unified web dashboard.   |
+| **🪄 1-Click AI Polisher**      | Converts informal agent notes into empathetic, professionally worded customer responses via AI prompt engineering.               | No typos or awkward phrasing—always crisp, professional support.           |
+| **🖥️ Fullscreen Focus Mode**   | Toggle button expands ticket detail/chat to 100% workspace width, hiding the ticket list sidebar.                               | Agents can focus on a single conversation without distractions.            |
+| **🌙 Dark Mode**                | Full dark theme with CSS attribute selectors handling Tailwind opacity variants and tinted badge backgrounds.                    | Easy on the eyes for night shifts and late-night support work.             |
+| **📱 Mobile-First UI**          | Custom responsive sliding drawers, mobile hamburger menus, and seamless single-pane detail views.                               | Works flawlessly on iPhones, Android devices, tablets, and desktops.       |
+| **⚡ Shimmer Skeletons**        | Smooth loading states with custom animated skeleton UI placeholders preventing layout shift.                                    | Zero layout shifts or blank screens while data is loading.                 |
+| **🛡️ Role-Based Security**     | Multi-tenant authorization (Customer, Agent, Admin) with audit logs and secure HTTP-only cookies.                               | Ensures customers only see their own tickets while staff manage the workspace. |
 
 ---
 
@@ -122,6 +222,8 @@ flowchart TD
     API[⚡ Node.js / Express API]
     Prisma[(🗄️ PostgreSQL Database)]
     AI[🧠 AI Engine - Llama 3.3 / Groq]
+    VADER[🔬 VADER NLP - Sentence Analysis]
+    Scorer[📊 Priority Scoring Engine]
     Agent([🧑‍💻 Support Agent / Admin])
     EmailOut[✉️ Resend Email Service]
 
@@ -135,7 +237,9 @@ flowchart TD
     API -->|Save Ticket| Prisma
     API -->|Trigger Async AI Enrichment| AI
 
-    AI -->|Categorize & Summarize| Prisma
+    AI -->|Categorize, Summarize & Sentiment| VADER
+    VADER -->|Validate & Reconcile Sentiment| Scorer
+    Scorer -->|Auto-Priority (LOW→URGENT)| Prisma
     AI -->|Auto-Resolve Routine Issues| User
 
     API -->|Push to Workspace| Agent
@@ -145,6 +249,87 @@ flowchart TD
     API -->|Update Ticket & Audit Log| Prisma
     API -->|Send Email Notification| EmailOut
     EmailOut -->|Delivers Email| User
+```
+
+---
+
+## 🗃️ Database Schema Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  User                                                               │
+│  ───────                                                            │
+│  id, email, passwordHash, name, role (CUSTOMER/AGENT/ADMIN),        │
+│  tier (STANDARD/PRO/ENTERPRISE), isActive                           │
+├─────────────────────────────────────────────────────────────────────┤
+│  Ticket                                                             │
+│  ───────                                                            │
+│  id, subject, description, status, priority, category,              │
+│  aiSummary, aiSuggestedPriority, sentiment, sentimentScore,         │
+│  urgencyKeywords[], autoPriority, aiReasoning,                      │
+│  customerId → User, agentId → User, notificationEmail               │
+├─────────────────────────────────────────────────────────────────────┤
+│  Reply                                                              │
+│  ───────                                                            │
+│  id, ticketId → Ticket, authorId → User, body,                     │
+│  isAiDraft, isInternal, sentiment, sentimentScore                   │
+├─────────────────────────────────────────────────────────────────────┤
+│  AuditEvent                                                         │
+│  ───────                                                            │
+│  id, ticketId → Ticket, actorId → User, action, fromValue, toValue  │
+└─────────────────────────────────────────────────────────────────────┘
+
+Enums: Role | CustomerTier | Sentiment | TicketStatus | Priority
+```
+
+---
+
+## 📁 Project Structure
+
+```
+Smart_Ticketing/
+├── apps/
+│   ├── api/                          # Backend REST API
+│   │   ├── prisma/
+│   │   │   └── schema.prisma         # Database schema (User, Ticket, Reply, AuditEvent)
+│   │   └── src/
+│   │       ├── routes/
+│   │       │   ├── auth.ts           # Signup, login, logout, session management
+│   │       │   ├── tickets.ts        # CRUD, assignment, status workflow, reply threads
+│   │       │   ├── email.ts          # Inbound email webhooks (Resend, Sender)
+│   │       │   ├── dashboard.ts      # Real-time analytics & metrics
+│   │       │   ├── adminUsers.ts     # User management (list, update, deactivate)
+│   │       │   └── ai.ts            # AI polish reply endpoint
+│   │       ├── services/
+│   │       │   ├── ai/
+│   │       │   │   ├── ticketAi.ts           # LLM analysis, auto-reply, enrichment
+│   │       │   │   ├── vaderSentiment.ts     # VADER NLP sentence-level analysis
+│   │       │   │   ├── sentimentScoring.ts   # Multi-factor priority scoring engine
+│   │       │   │   └── provider.ts           # AI provider abstraction (Groq/Gemini)
+│   │       │   └── email/
+│   │       │       └── emailService.ts       # Resend email delivery service
+│   │       ├── middleware/
+│   │       │   └── auth.ts           # Session auth & role-based guards
+│   │       └── lib/
+│   │           └── prisma.ts         # Prisma client singleton
+│   │
+│   └── web/                          # Frontend React SPA
+│       └── src/
+│           ├── components/
+│           │   ├── tickets/
+│           │   │   └── TicketsPage.tsx    # Ticket list + detail/chat panel + fullscreen
+│           │   ├── dashboard/            # Analytics dashboard with charts
+│           │   ├── settings/             # Admin user management
+│           │   └── auth/                 # Login & signup forms
+│           ├── lib/
+│           │   └── types.ts              # Shared TypeScript interfaces
+│           ├── App.tsx                   # Root layout, routing, dark mode toggle
+│           └── index.css                # Global styles, dark mode overrides
+│
+├── docs/images/                      # Screenshots & diagrams
+├── docker-compose.yml                # Local PostgreSQL via Docker
+├── playwright.config.ts              # E2E test configuration
+└── package.json                      # Monorepo workspace config
 ```
 
 ---
@@ -166,6 +351,13 @@ The web application is engineered for multi-device perfection across laptops, ta
   └──────────────┴───────────────────┴──────────────────────────────┘
 
   ┌─────────────────────────────────────────────────────────────────┐
+  │                    FULLSCREEN FOCUS MODE                         │
+  ├─────────────────────────────────────────────────────────────────┤
+  │   SIDEBAR    │          TICKET DETAIL / CHAT (100% width)       │
+  │   (Fixed)    │          Ticket list hidden via toggle button     │
+  └──────────────┴──────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────┐
   │                        MOBILE VIEW (<768px)                     │
   ├─────────────────────────────────────────────────────────────────┤
   │ [☰] Header with Mobile Drawer Menu                              │
@@ -177,6 +369,7 @@ The web application is engineered for multi-device perfection across laptops, ta
 
 - **Sliding Navigation Drawer**: On mobile devices, clicking the hamburger icon `[☰]` slides out the navigation drawer with a frosted backdrop.
 - **Single-Pane Chat View**: On mobile, selecting a ticket seamlessly switches from the list view to the dedicated ticket detail view, providing maximum screen space for reading and composing replies.
+- **Fullscreen Focus Mode**: On desktop, agents can toggle fullscreen to hide the ticket list and focus entirely on the current conversation.
 
 ---
 
@@ -186,7 +379,7 @@ The web application is engineered for multi-device perfection across laptops, ta
 
 - **Framework**: [React 19](https://react.dev/) — Declarative UI library for high-speed component rendering.
 - **Build Tool**: [Vite 6](https://vitejs.dev/) — Next-generation frontend tooling providing instant HMR (Hot Module Replacement).
-- **Styling**: Vanilla CSS + [Tailwind CSS v4](https://tailwindcss.com/) — Clean design system with HSL colors, glassmorphism, and custom shimmer animations.
+- **Styling**: Vanilla CSS + [Tailwind CSS v4](https://tailwindcss.com/) — Clean design system with HSL colors, glassmorphism, dark mode, and custom shimmer animations.
 - **Icons**: [Lucide React](https://lucide.dev/) — Crisp, modern vector icon set.
 - **State & Routing**: Component-level state with URL parameter syncing and responsive mobile view state.
 
@@ -204,9 +397,11 @@ The web application is engineered for multi-device perfection across laptops, ta
 - **ORM**: [Prisma](https://www.prisma.io/) — Type-safe database client and automated migration tool.
 - **Indexes**: Optimized indexes on `customerId`, `agentId`, `status`, `priority`, `category`, `ticketId`, `authorId`, and `notificationEmail` for sub-millisecond query performance.
 
-### 🧠 Intelligence & Integration Engine
+### 🧠 Intelligence & NLP Engine
 
-- **LLM Provider**: OpenAI-compatible Groq API running `llama-3.3-70b-versatile`.
+- **LLM Provider**: OpenAI-compatible Groq API running `llama-3.3-70b-versatile` for ticket analysis, categorization, summarization, and auto-reply generation.
+- **NLP Validation**: [vader-sentiment](https://www.npmjs.com/package/vader-sentiment) — Local VADER (Valence Aware Dictionary and sEntiment Reasoner) for sentence-level sentiment validation with zero API cost.
+- **Priority Scoring**: Custom multi-factor scoring engine combining sentiment + keywords + customer tier + category risk + thread escalation trends.
 - **Email Delivery**: [Resend API](https://resend.com/) for transactional outbound emails and inbound webhook events.
 
 ---
@@ -227,8 +422,21 @@ The web application is engineered for multi-device perfection across laptops, ta
 
 ### 2. Testing Strategy
 
-- **Unit & Integration Tests**: Run with **Vitest** testing database isolation, auth guards, ticket APIs, and email webhooks (31/31 tests passing).
+- **Unit & Integration Tests**: Run with **Vitest** — 44 tests across 8 test files covering auth guards, ticket APIs, email webhooks, VADER sentiment analysis, and priority scoring engine.
 - **Browser E2E Tests**: Powered by **Playwright**, testing full end-to-end customer sign-up, ticket submission, agent resolution, and admin management.
+
+### Test Files
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `auth.test.ts` | 8 | Signup, login, logout, role guards, inactive users |
+| `tickets.test.ts` | 8 | CRUD, assignment, workflow, filters, AI enrichment, polish |
+| `email.test.ts` | 5 | Inbound webhooks, reply threading, Resend/Sender formats |
+| `adminUsers.test.ts` | 6 | User listing, search, update, deactivation |
+| `dashboard.test.ts` | 3 | Auth guards, metrics, analytics |
+| `sentimentScoring.test.ts` | 4 | Priority scoring factors and edge cases |
+| `vaderSentiment.test.ts` | 9 | Sentence-level analysis, ALL CAPS, negation, LLM/VADER reconciliation |
+| `app.test.ts` | 1 | Server health check |
 
 ---
 
@@ -260,7 +468,7 @@ The web application is engineered for multi-device perfection across laptops, ta
    AI_PROVIDER="groq"
    GROQ_API_KEY="your-groq-key"
    RESEND_API_KEY="your-resend-key"
-   RESEND_FROM_EMAIL="support@rohitis.online"
+   RESEND_FROM_EMAIL="support@yourdomain.com"
    ```
 
 3. **Database Migration & Seeding**:
@@ -282,7 +490,7 @@ The web application is engineered for multi-device perfection across laptops, ta
 
 5. **Run Test Suites**:
    ```bash
-   # Run Vitest unit & integration tests
+   # Run Vitest unit & integration tests (44 tests)
    npm run test
 
    # Run Playwright E2E tests
@@ -297,6 +505,7 @@ The web application is engineered for multi-device perfection across laptops, ta
 - 🍪 **Session Security**: HTTP-only cookies prevent XSS token theft.
 - 🛡️ **Role Authorization**: Middleware verifies `CUSTOMER`, `AGENT`, and `ADMIN` scopes on every API route.
 - 🧼 **Input Sanitization**: Payload validation using `Zod` blocks malicious data structures before hitting DB transactions.
+- 📝 **Audit Trail**: Every ticket state change is logged with actor, action, and timestamp.
 
 ---
 

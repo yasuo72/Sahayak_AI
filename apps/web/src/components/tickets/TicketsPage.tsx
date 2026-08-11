@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -8,7 +8,9 @@ import {
   FileText,
   Inbox,
   Lock,
+  Maximize2,
   MessageSquare,
+  Minimize2,
   RefreshCw,
   Search,
   Send,
@@ -57,7 +59,8 @@ export function TicketsPage({
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
-  const [showOverview, setShowOverview] = useState(true);
+  const [showOverview, setShowOverview] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | TicketStatus>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | Priority>('ALL');
   const [search, setSearch] = useState('');
@@ -76,6 +79,8 @@ export function TicketsPage({
   const [editingSummary, setEditingSummary] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState('');
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const selected = tickets.find((t) => t.id === selectedId) ?? tickets[0] ?? null;
 
   const filtered = tickets.filter((t) => {
@@ -86,6 +91,10 @@ export function TicketsPage({
   // Derive current summary value from selected ticket (no effect needed)
   const summaryValue = editingSummary ? summaryDraft : (selected?.aiSummary ?? '');
   const setSummaryValue = (v: string) => setSummaryDraft(v);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selected?.id, selected?.replies?.length]);
 
   useEffect(() => {
     void loadTickets();
@@ -128,6 +137,9 @@ export function TicketsPage({
     setDescription('');
     setNewPriority('MEDIUM');
     setShowCreateForm(false);
+
+    // Auto-refetch after 3s to pick up AI enrichment (priority, sentiment, summary)
+    setTimeout(() => void loadTickets(), 3000);
   }
 
   async function updateTicket(id: string, patch: Partial<Ticket> & { assignToMe?: boolean }) {
@@ -192,12 +204,12 @@ export function TicketsPage({
         isCustomer={isCustomer ?? user.role === 'CUSTOMER'}
       />
 
-      <div className="flex flex-1 overflow-hidden" data-testid="ticket-workspace">
+      <div className="flex flex-1 min-h-0 overflow-hidden" data-testid="ticket-workspace">
         {/* Left panel: list */}
         <div
           className={cn(
-            'flex flex-col w-full md:w-80 shrink-0 border-r border-slate-200 bg-white overflow-hidden',
-            mobileShowDetail ? 'hidden md:flex' : 'flex',
+            'flex flex-col w-full md:w-80 shrink-0 border-r border-slate-200 bg-white overflow-hidden transition-all',
+            isFullScreen ? 'hidden' : mobileShowDetail ? 'hidden md:flex' : 'flex',
           )}
           data-testid="ticket-list"
         >
@@ -400,13 +412,41 @@ export function TicketsPage({
                       >
                         {cleanSubject(ticket.subject)}
                       </p>
-                      <PriorityBadge priority={ticket.priority} />
+                      <div className="flex items-center gap-1 shrink-0">
+                        {ticket.sentiment && (
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded border flex items-center gap-1 font-medium"
+                            title={`Sentiment: ${ticket.sentiment} (${ticket.sentimentScore?.toFixed(2) ?? '0.00'})`}
+                          >
+                            <span>
+                              {ticket.sentiment === 'ANGRY'
+                                ? '😡'
+                                : ticket.sentiment === 'FRUSTRATED'
+                                  ? '🟧'
+                                  : ticket.sentiment === 'CONFUSED'
+                                    ? '❓'
+                                    : ticket.sentiment === 'POSITIVE'
+                                      ? '😊'
+                                      : '😐'}
+                            </span>
+                            <span className="hidden sm:inline text-[10px]">
+                              {ticket.sentiment}
+                            </span>
+                          </span>
+                        )}
+                        <PriorityBadge priority={ticket.priority} />
+                      </div>
                     </div>
                     <p className="mt-1 text-xs text-slate-500 truncate">
                       {ticket.aiSummary ?? ticket.description}
                     </p>
                     <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                       <StatusBadge status={ticket.status} />
+                      {ticket.autoPriority && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                          ⚡ Auto: {ticket.autoPriority}
+                        </span>
+                      )}
                       {ticket.category && (
                         <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">
                           {ticket.category}
@@ -426,152 +466,218 @@ export function TicketsPage({
         {/* Right panel: detail */}
         <div
           className={cn(
-            'flex-1 flex flex-col overflow-hidden bg-slate-50 min-w-0',
+            'flex-1 flex flex-col overflow-hidden bg-slate-50/60 min-w-0 h-full',
             mobileShowDetail ? 'flex' : 'hidden md:flex',
           )}
           data-testid="ticket-detail"
         >
           {selected ? (
             <>
-              {/* Detail header */}
-              <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shrink-0">
+              {/* REGION 1: Top (Fixed Header & Metadata - ultra-compact) */}
+              <div className="bg-white border-b border-slate-200/90 px-4 py-2 shrink-0 space-y-1.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setMobileShowDetail(false)}
-                  className="md:hidden inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 mb-3 py-1.5 px-3 rounded-lg bg-indigo-50 border border-indigo-100 cursor-pointer transition"
+                  className="md:hidden inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 py-0.5 px-2 rounded bg-indigo-50 border border-indigo-100 cursor-pointer transition"
                 >
-                  <ArrowLeft className="size-3.5" />
+                  <ArrowLeft className="size-3" />
                   Back to tickets
                 </button>
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1 text-[11px] text-slate-400">
                       <span>Tickets</span>
-                      <ChevronRight className="size-3" />
-                      <span className="text-slate-600 font-medium truncate max-w-60">
+                      <ChevronRight className="size-2.5" />
+                      <span className="text-slate-600 font-medium truncate max-w-52">
                         {cleanSubject(selected.subject)}
                       </span>
                     </div>
-                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
                       {cleanSubject(selected.subject)}
                     </h2>
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                       <StatusBadge status={selected.status} />
                       <PriorityBadge priority={selected.priority} />
+                      {selected.autoPriority && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                          ⚡ Auto: {selected.autoPriority}
+                        </span>
+                      )}
+                      {selected.sentiment && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                          <span>
+                            {selected.sentiment === 'ANGRY'
+                              ? '😡'
+                              : selected.sentiment === 'FRUSTRATED'
+                                ? '🟧'
+                                : selected.sentiment === 'CONFUSED'
+                                  ? '❓'
+                                  : selected.sentiment === 'POSITIVE'
+                                    ? '😊'
+                                    : '😐'}
+                          </span>
+                          <span>{selected.sentiment}</span>
+                          {selected.sentimentScore !== null && selected.sentimentScore !== undefined && (
+                            <span className="text-[10px] text-slate-500">
+                              ({selected.sentimentScore.toFixed(2)})
+                            </span>
+                          )}
+                        </span>
+                      )}
                       {selected.category && (
-                        <span className="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                        <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700">
                           {selected.category}
                         </span>
                       )}
-                      <span className="text-xs text-slate-400">#{selected.id.slice(-8)}</span>
+                      {selected.customer.tier && (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                          👑 {selected.customer.tier}
+                        </span>
+                      )}
+                      <span className="text-[11px] text-slate-400">#{selected.id.slice(-8)}</span>
                     </div>
                   </div>
 
-                  {/* Staff controls */}
-                  {isStaff && (
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <select
-                        value={selected.status}
-                        onChange={(e) =>
-                          void updateTicket(selected.id, { status: e.target.value as TicketStatus })
-                        }
-                        className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-indigo-400 shadow-sm cursor-pointer"
-                      >
-                        {statuses.map((s) => (
-                          <option key={s} value={s}>
-                            {s.replace(/_/g, ' ')}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={selected.priority}
-                        onChange={(e) =>
-                          void updateTicket(selected.id, { priority: e.target.value as Priority })
-                        }
-                        className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-indigo-400 shadow-sm cursor-pointer"
-                      >
-                        {priorities.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
+                  {/* Staff controls & Fullscreen toggle */}
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0 ml-auto">
+                    {isStaff && selected.autoPriority && selected.autoPriority !== selected.priority && (
                       <button
-                        onClick={() => void updateTicket(selected.id, { assignToMe: true })}
-                        className="flex items-center gap-1.5 h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm cursor-pointer"
+                        type="button"
+                        onClick={() => void updateTicket(selected.id, { priority: selected.autoPriority! })}
+                        className="flex items-center gap-1 h-6 rounded-md border border-indigo-300 bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                        title="Adopt AI-calculated autoPriority"
                       >
-                        <UserCog className="size-3.5" />
-                        Assign to me
+                        ⚡ Apply AI ({selected.autoPriority})
                       </button>
-                    </div>
-                  )}
+                    )}
+                    {isStaff && (
+                      <>
+                        <select
+                          value={selected.status}
+                          onChange={(e) =>
+                            void updateTicket(selected.id, { status: e.target.value as TicketStatus })
+                          }
+                          className="h-6 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-indigo-400 cursor-pointer"
+                        >
+                          {statuses.map((s) => (
+                            <option key={s} value={s}>
+                              {s.replace(/_/g, ' ')}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={selected.priority}
+                          onChange={(e) =>
+                            void updateTicket(selected.id, { priority: e.target.value as Priority })
+                          }
+                          className="h-6 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-indigo-400 cursor-pointer"
+                        >
+                          {priorities.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => void updateTicket(selected.id, { assignToMe: true })}
+                          className="flex items-center gap-1 h-6 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          <UserCog className="size-3" />
+                          Assign
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsFullScreen((prev) => !prev)}
+                      className={cn(
+                        'flex items-center gap-1 h-6 rounded-md border px-2 text-[11px] font-semibold transition cursor-pointer',
+                        isFullScreen
+                          ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs',
+                      )}
+                      title={isFullScreen ? 'Exit Fullscreen' : 'Fullscreen Chat Mode'}
+                    >
+                      {isFullScreen ? <Minimize2 className="size-3" /> : <Maximize2 className="size-3" />}
+                      <span className="hidden sm:inline">{isFullScreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Meta info row */}
-                <div className="flex flex-wrap gap-4 mt-3 text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 pt-0.5 border-t border-slate-100">
                   <span>
-                    <span className="font-medium text-slate-700">Customer: </span>
+                    <span className="font-semibold text-slate-700">Customer: </span>
                     {selected.customer.name} ({selected.customer.email})
                   </span>
                   <span>
-                    <span className="font-medium text-slate-700">Assigned: </span>
+                    <span className="font-semibold text-slate-700">Assigned: </span>
                     {selected.agent?.name ?? 'Unassigned'}
                   </span>
                   <span>
-                    <span className="font-medium text-slate-700">Created: </span>
+                    <span className="font-semibold text-slate-700">Created: </span>
                     {formatFullDate(selected.createdAt)}
                   </span>
                 </div>
+
+                {/* AI Reasoning Banner */}
+                {selected.aiReasoning && (
+                  <div className="rounded-md border border-indigo-200/90 bg-indigo-50/80 px-2.5 py-1 text-[11px] text-indigo-950 flex items-center gap-1.5">
+                    <Bot className="size-3 text-indigo-600 shrink-0" />
+                    <span className="font-semibold text-indigo-900 shrink-0">AI Priority Reasoning:</span>
+                    <span className="truncate">{selected.aiReasoning}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Main Scrollable Thread & Overview Area */}
-              <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4">
+              {/* REGION 2: Middle (Flexible & Scrollable Message Thread - compact fonts) */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-2.5 space-y-2.5 flex flex-col bg-slate-50/50">
                 {/* Description & AI Summary Collapsible Card */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in transition-all">
+                <div className="bg-white rounded-lg border border-slate-200/90 shadow-2xs overflow-hidden animate-fade-in transition-all shrink-0">
                   {/* Card Header Bar */}
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100 select-none">
-                    <div className="flex items-center gap-2">
-                      <FileText className="size-4 text-indigo-500" />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                  <div className="flex items-center justify-between px-3 py-1 bg-slate-50/90 border-b border-slate-100 select-none">
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="size-3 text-indigo-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
                         Issue Overview & Summary
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowOverview((prev) => !prev)}
-                      className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-indigo-600 transition cursor-pointer"
+                      className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-indigo-600 transition cursor-pointer"
                     >
-                      <span>{showOverview ? 'Collapse' : 'Expand'}</span>
+                      <span>{showOverview ? 'Hide Details' : 'View Details'}</span>
                       {showOverview ? (
-                        <ChevronUp className="size-3.5" />
+                        <ChevronUp className="size-3" />
                       ) : (
-                        <ChevronDown className="size-3.5" />
+                        <ChevronDown className="size-3" />
                       )}
                     </button>
                   </div>
 
                   {/* Card Body */}
                   {showOverview ? (
-                    <div className="p-4 space-y-3">
+                    <div className="p-2.5 space-y-1.5">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
                           Description
                         </p>
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
                           {selected.description}
                         </p>
                       </div>
 
-                      <div className="pt-3 border-t border-slate-100">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                            <Bot className="size-3.5 text-indigo-500" />
+                      <div className="pt-1.5 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                            <Bot className="size-3 text-indigo-500" />
                             AI Summary
                           </p>
                           {isStaff && !editingSummary && (
                             <button
                               onClick={() => setEditingSummary(true)}
-                              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition cursor-pointer"
+                              className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold transition cursor-pointer"
                             >
                               Edit
                             </button>
@@ -579,22 +685,22 @@ export function TicketsPage({
                         </div>
 
                         {editingSummary ? (
-                          <div className="space-y-2">
+                          <div className="space-y-1.5">
                             <textarea
                               value={summaryValue}
                               onChange={(e) => setSummaryValue(e.target.value)}
                               placeholder="Write a brief summary of this ticket..."
                               rows={2}
-                              className="w-full text-xs rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white resize-none"
+                              className="w-full text-xs rounded-md border border-slate-200 bg-slate-50 px-2 py-1 outline-none focus:border-indigo-400 focus:bg-white resize-none"
                             />
-                            <div className="flex justify-end gap-1.5">
+                            <div className="flex justify-end gap-1">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setEditingSummary(false);
                                   setSummaryValue(selected.aiSummary ?? '');
                                 }}
-                                className="px-2 py-1 rounded text-[11px] font-medium text-slate-500 hover:bg-slate-100 transition cursor-pointer"
+                                className="px-2 py-0.5 rounded text-[10px] font-medium text-slate-500 hover:bg-slate-100 transition cursor-pointer"
                               >
                                 Cancel
                               </button>
@@ -604,7 +710,7 @@ export function TicketsPage({
                                   void updateTicket(selected.id, { aiSummary: summaryValue });
                                   setEditingSummary(false);
                                 }}
-                                className="px-2 py-1 rounded text-[11px] font-medium text-white transition cursor-pointer"
+                                className="px-2 py-0.5 rounded text-[10px] font-medium text-white transition cursor-pointer"
                                 style={{ background: '#6366f1' }}
                               >
                                 Save
@@ -620,7 +726,7 @@ export function TicketsPage({
                     </div>
                   ) : (
                     <div
-                      className="px-4 py-2 text-xs text-slate-500 truncate cursor-pointer hover:bg-slate-50 transition"
+                      className="px-3 py-1 text-[11px] text-slate-500 truncate cursor-pointer hover:bg-slate-50 transition"
                       onClick={() => setShowOverview(true)}
                     >
                       <span className="font-semibold text-slate-700">Summary: </span>
@@ -628,68 +734,75 @@ export function TicketsPage({
                     </div>
                   )}
                 </div>
-                {selected.replies.map((reply) => {
+
+                {/* Message Thread */}
+                {selected.replies.map((reply, index) => {
                   const isCustomer = reply.author.role === 'CUSTOMER';
+                  const isSenderChange =
+                    index === 0 ||
+                    selected.replies[index - 1].author.id !== reply.author.id;
+
                   return (
                     <article
                       key={reply.id}
                       className={cn(
-                        'flex gap-3 animate-fade-in',
-                        isCustomer ? 'flex-row' : 'flex-row-reverse',
+                        'flex gap-2 animate-fade-in my-0.5',
+                        isCustomer ? 'items-start justify-start' : 'items-start justify-end ml-auto',
+                        isSenderChange ? 'mt-2.5' : 'mt-1',
                       )}
                     >
-                      {/* Avatar */}
-                      <div
-                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white mt-1"
-                        style={{
-                          background: isCustomer
-                            ? 'linear-gradient(135deg,#3b82f6,#06b6d4)'
-                            : reply.author.name === 'AI System'
-                              ? 'linear-gradient(135deg,#6366f1,#8b5cf6)'
-                              : 'linear-gradient(135deg,#10b981,#059669)',
-                        }}
-                      >
-                        {reply.author.name === 'AI System' ? (
-                          <Bot className="size-4" />
-                        ) : (
-                          getInitials(reply.author.name)
-                        )}
-                      </div>
+                      {/* Customer Avatar (Left) */}
+                      {isCustomer && (
+                        <div
+                          className="flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-2xs mt-0.5"
+                          style={{ background: 'linear-gradient(135deg,#3b82f6,#06b6d4)' }}
+                        >
+                          {getInitials(reply.author.name)}
+                        </div>
+                      )}
 
                       <div
                         className={cn(
-                          'max-w-[85%] sm:max-w-[75%] space-y-1',
+                          'max-w-[82%] sm:max-w-[68%] flex flex-col',
                           isCustomer ? 'items-start' : 'items-end',
                         )}
                       >
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-medium text-slate-700">
+                        {/* Author line */}
+                        <div
+                          className={cn(
+                            'flex items-center gap-1 flex-wrap mb-0.5 text-[11px]',
+                            isCustomer ? 'justify-start text-left' : 'justify-end text-right',
+                          )}
+                        >
+                          <span className="font-semibold text-slate-700">
                             {reply.author.name}
                           </span>
-                          <span className="text-xs text-slate-400">{reply.author.role}</span>
+                          <span className="text-slate-400 text-[10px]">({reply.author.role.toLowerCase()})</span>
                           {reply.isInternal && (
-                            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                              Internal Note
+                            <span className="rounded-full border border-amber-200 bg-amber-50 px-1 py-0.1 text-[9px] font-semibold text-amber-700">
+                              Internal
                             </span>
                           )}
                           {reply.author.name === 'AI System' && (
-                            <span className="flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                              <Bot className="size-3" />
+                            <span className="inline-flex items-center gap-0.5 rounded-full border border-indigo-200 bg-indigo-50 px-1 py-0.1 text-[9px] font-semibold text-indigo-700">
+                              <Bot className="size-2" />
                               AI
                             </span>
                           )}
-                          <span className="text-xs text-slate-400">
-                            {formatRelativeTime(reply.createdAt)}
+                          <span className="text-slate-400 font-normal text-[10px]">
+                            · {formatRelativeTime(reply.createdAt)}
                           </span>
                         </div>
+
+                        {/* Message Bubble - compact fonts */}
                         <div
                           className={cn(
-                            'rounded-xl px-4 py-3 text-sm leading-relaxed shadow-sm',
+                            'rounded-xl px-3 py-1.5 text-xs leading-relaxed shadow-2xs',
                             reply.isInternal
-                              ? 'border border-amber-200 bg-amber-50 text-amber-900'
+                              ? 'border border-amber-200 bg-amber-50 text-amber-900 rounded-tr-xs'
                               : isCustomer
-                                ? 'border border-slate-200 bg-white text-slate-800'
-                                : 'text-white',
+                                ? 'border border-slate-200/90 bg-white text-slate-800 rounded-tl-xs'
+                                : 'text-white rounded-tr-xs',
                           )}
                           style={
                             !reply.isInternal && !isCustomer
@@ -700,107 +813,129 @@ export function TicketsPage({
                           <p className="whitespace-pre-wrap">{reply.body}</p>
                         </div>
                       </div>
+
+                      {/* Staff/Agent/AI Avatar (Right) */}
+                      {!isCustomer && (
+                        <div
+                          className="flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-2xs mt-0.5"
+                          style={{
+                            background:
+                              reply.author.name === 'AI System'
+                                ? 'linear-gradient(135deg,#6366f1,#8b5cf6)'
+                                : 'linear-gradient(135deg,#10b981,#059669)',
+                          }}
+                        >
+                          {reply.author.name === 'AI System' ? (
+                            <Bot className="size-3" />
+                          ) : (
+                            getInitials(reply.author.name)
+                          )}
+                        </div>
+                      )}
                     </article>
                   );
                 })}
 
                 {selected.replies.length === 0 && (
-                  <div className="flex flex-col items-center py-8 text-center">
-                    <MessageSquare className="size-8 text-slate-300 mb-2" />
-                    <p className="text-sm text-slate-400">
+                  <div className="flex flex-col items-center justify-center py-6 text-center my-auto">
+                    <MessageSquare className="size-6 text-slate-300 mb-1" />
+                    <p className="text-xs text-slate-400">
                       No replies yet. Start the conversation below.
                     </p>
                   </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
 
-              {/* Reply composer */}
-              <div className="shrink-0 border-t border-slate-200 bg-white px-3 sm:px-6 py-3 sm:py-4">
+              {/* REGION 3: Bottom (Fixed Reply Composer - ultra compact) */}
+              <div className="shrink-0 border-t border-slate-200/90 bg-white px-3 sm:px-4 py-2 shadow-sm z-10">
                 {selected.status === 'CLOSED' && !isStaff && (
-                  <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600 mb-3">
-                    <Lock className="size-4" />
+                  <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-600 mb-1.5">
+                    <Lock className="size-3 text-slate-500" />
                     This ticket is closed. Contact support to reopen.
                   </div>
                 )}
-                <form onSubmit={createReply} data-testid="reply-form" className="space-y-3">
-                  <textarea
-                    required
-                    rows={3}
-                    placeholder="Write your reply..."
-                    value={replyBody}
-                    disabled={!isStaff && selected.status === 'CLOSED'}
-                    onChange={(e) => {
-                      setReplyBody(e.target.value);
-                      setPolishedReply('');
-                    }}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none resize-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
-                  />
+                <form onSubmit={createReply} data-testid="reply-form">
+                  <div className="rounded-lg border border-slate-200/90 bg-slate-50/70 p-1.5 space-y-1.5 focus-within:bg-white focus-within:border-indigo-400 transition-all">
+                    <textarea
+                      required
+                      rows={1}
+                      placeholder="Write your reply..."
+                      value={replyBody}
+                      disabled={!isStaff && selected.status === 'CLOSED'}
+                      onChange={(e) => {
+                        setReplyBody(e.target.value);
+                        setPolishedReply('');
+                      }}
+                      className="w-full min-h-[36px] max-h-[80px] rounded-md border-none bg-transparent px-2 py-1 text-xs text-slate-800 placeholder-slate-400 outline-none resize-none"
+                    />
 
-                  {polishedReply && (
-                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 animate-fade-in">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700">
-                          <Wand2 className="size-3.5" />
-                          AI Polished Reply
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReplyBody(polishedReply);
-                            setPolishedReply('');
-                          }}
-                          className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition cursor-pointer"
-                        >
-                          Use this →
-                        </button>
-                      </div>
-                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{polishedReply}</p>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-3">
-                      {isStaff && (
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <div
-                            className={cn(
-                              'relative w-9 h-5 rounded-full transition-colors',
-                              isInternal ? 'bg-amber-500' : 'bg-slate-200',
-                            )}
-                            onClick={() => setIsInternal((p) => !p)}
+                    {polishedReply && (
+                      <div className="rounded-md border border-indigo-200 bg-indigo-50/80 p-2 animate-fade-in">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
+                            <Wand2 className="size-3" />
+                            AI Polished Reply
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyBody(polishedReply);
+                              setPolishedReply('');
+                            }}
+                            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition cursor-pointer"
                           >
+                            Use this →
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{polishedReply}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+                      <div className="flex items-center gap-2">
+                        {isStaff && (
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
                             <div
                               className={cn(
-                                'absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform',
-                                isInternal ? 'translate-x-4' : 'translate-x-0.5',
+                                'relative w-6 h-3.5 rounded-full transition-colors',
+                                isInternal ? 'bg-amber-500' : 'bg-slate-300',
                               )}
-                            />
-                          </div>
-                          <span className="text-xs font-medium text-slate-600">Internal note</span>
-                        </label>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isStaff && (
+                              onClick={() => setIsInternal((p) => !p)}
+                            >
+                              <div
+                                className={cn(
+                                  'absolute top-0.5 size-2.5 rounded-full bg-white shadow-2xs transition-transform',
+                                  isInternal ? 'translate-x-2.5' : 'translate-x-0.5',
+                                )}
+                              />
+                            </div>
+                            <span className="text-[11px] font-semibold text-slate-600">Internal note</span>
+                          </label>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        {isStaff && (
+                          <button
+                            type="button"
+                            disabled={!replyBody || isPolishing}
+                            onClick={() => void polishReply()}
+                            className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-40 cursor-pointer"
+                          >
+                            <Wand2 className={`size-3 ${isPolishing ? 'animate-spin' : ''}`} />
+                            {isPolishing ? 'Polishing...' : 'Polish'}
+                          </button>
+                        )}
                         <button
-                          type="button"
-                          disabled={!replyBody || isPolishing}
-                          onClick={() => void polishReply()}
-                          className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-40 cursor-pointer"
+                          type="submit"
+                          disabled={!isStaff && selected.status === 'CLOSED'}
+                          className="flex items-center gap-1 rounded-md px-3 py-0.5 text-[11px] sm:text-xs font-semibold text-white transition hover:opacity-90 shadow-2xs disabled:opacity-40 cursor-pointer"
+                          style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}
                         >
-                          <Wand2 className={`size-3.5 ${isPolishing ? 'animate-spin' : ''}`} />
-                          {isPolishing ? 'Polishing...' : 'Polish with AI'}
+                          <Send className="size-3" />
+                          Send Reply
                         </button>
-                      )}
-                      <button
-                        type="submit"
-                        disabled={!isStaff && selected.status === 'CLOSED'}
-                        className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40 cursor-pointer"
-                        style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}
-                      >
-                        <Send className="size-3.5" />
-                        Send Reply
-                      </button>
+                      </div>
                     </div>
                   </div>
                 </form>

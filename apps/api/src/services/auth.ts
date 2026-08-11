@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { Role, type User } from '../generated/prisma/client.js';
+import { CustomerTier, Role, type User } from '../generated/prisma/client.js';
 import { prisma } from '../lib/prisma.js';
 import type { SafeUser } from '../types/auth.js';
 
@@ -21,6 +21,7 @@ export function toSafeUser(user: User): SafeUser {
     email: user.email,
     name: user.name,
     role: user.role,
+    tier: user.tier ?? CustomerTier.STANDARD,
     isActive: user.isActive,
     createdAt: user.createdAt.toISOString(),
   };

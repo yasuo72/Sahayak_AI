@@ -1,7 +1,9 @@
-import { Priority, Role, TicketStatus } from '../../generated/prisma/client.js';
+import { CustomerTier, Priority, Role, Sentiment, TicketStatus } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
 import { sendTicketReplyEmail } from '../email/emailService.js';
 import { getAiProvider } from './provider.js';
+import { calculateAutoPriority } from './sentimentScoring.js';
+import { analyzeWithVader, reconcileSentiment } from './vaderSentiment.js';
 
 type ClassificationResult = {
   category: string;
@@ -12,11 +14,15 @@ type ClassificationResult = {
 
 const allowedCategories = new Set(['Billing', 'Technical', 'Account', 'General', 'Other']);
 const allowedPriorities = new Set(Object.values(Priority));
+const allowedSentiments = new Set(Object.values(Sentiment));
 
 export type AnalysisResult = {
   summary: string;
   category: string;
   priority: Priority;
+  sentiment: Sentiment;
+  sentimentScore: number;
+  urgencyKeywords: string[];
   autoResolvable: boolean;
   autoReply: string | null;
 };
@@ -26,8 +32,77 @@ function fallbackTicketAnalysis(subject: string, description: string): AnalysisR
 
   let category = 'General';
   let priority: Priority = Priority.MEDIUM;
+  let sentiment: Sentiment = Sentiment.NEUTRAL;
+  let sentimentScore = 0.0;
+  const urgencyKeywords: string[] = [];
   let autoResolvable = false;
   let autoReply = `Thank you for reaching out to support regarding "${subject}". Our support team has received your ticket and will investigate shortly.`;
+
+  // Keyword extraction for sentiment & urgency
+  if (
+    combined.includes('angry') ||
+    combined.includes('terrible') ||
+    combined.includes('worst') ||
+    combined.includes('lawyer') ||
+    combined.includes('unacceptable') ||
+    combined.includes('extremely upset') ||
+    combined.includes('cracked') ||
+    combined.includes('money back')
+  ) {
+    sentiment = Sentiment.ANGRY;
+    sentimentScore = -0.85;
+  } else if (
+    combined.includes('frustrated') ||
+    combined.includes('broken') ||
+    combined.includes('annoyed') ||
+    combined.includes('fail') ||
+    combined.includes('stuck') ||
+    combined.includes('damaged')
+  ) {
+    sentiment = Sentiment.FRUSTRATED;
+    sentimentScore = -0.5;
+  } else if (
+    combined.includes('confused') ||
+    combined.includes('how to') ||
+    combined.includes("don't understand") ||
+    combined.includes('where is')
+  ) {
+    sentiment = Sentiment.CONFUSED;
+    sentimentScore = -0.1;
+  } else if (
+    combined.includes('great') ||
+    combined.includes('love') ||
+    combined.includes('awesome')
+  ) {
+    sentiment = Sentiment.POSITIVE;
+    sentimentScore = 0.7;
+  }
+
+  const potentialUrgentKw = [
+    'urgent',
+    'asap',
+    'down',
+    'outage',
+    'emergency',
+    'refund',
+    'replacement',
+    'money back',
+    'cracked',
+    'damaged',
+    'defective',
+    'cancel',
+    'lawyer',
+    'overcharged',
+    'critical',
+    'worst',
+    'immediately',
+    'fast',
+  ];
+  for (const kw of potentialUrgentKw) {
+    if (combined.includes(kw)) {
+      urgencyKeywords.push(kw);
+    }
+  }
 
   if (
     combined.includes('password') ||
@@ -77,10 +152,21 @@ function fallbackTicketAnalysis(subject: string, description: string): AnalysisR
 
   const summary = `Customer request regarding ${subject.trim() || 'support'}.`;
 
+  // Even in fallback mode, run VADER for better accuracy than keyword matching
+  const vaderResult = analyzeWithVader(`${subject} ${description}`);
+  const reconciled = reconcileSentiment(sentiment, sentimentScore, vaderResult);
+
+  console.log(
+    `[Sentiment/Fallback] Keywords: ${sentiment}(${sentimentScore}) | VADER: ${vaderResult.sentiment}(${vaderResult.sentimentScore}, ${vaderResult.confidence}) | Final: ${reconciled.sentiment}(${reconciled.sentimentScore}) via ${reconciled.source}`,
+  );
+
   return {
     summary,
     category,
     priority,
+    sentiment: reconciled.sentiment,
+    sentimentScore: reconciled.sentimentScore,
+    urgencyKeywords,
     autoResolvable,
     autoReply,
   };
@@ -92,19 +178,26 @@ export async function analyzeTicketWithAi(
 ): Promise<AnalysisResult> {
   try {
     const prompt = `ANALYZE_TICKET
-Analyze this customer support ticket and provide a helpful response.
+Analyze this customer support ticket and provide a comprehensive analysis including emotional tone and priority scoring.
 
 Return only valid JSON with this shape:
 {
   "summary": "1-2 sentence concise summary of the issue for an agent queue",
   "category": "Billing" | "Technical" | "Account" | "General" | "Other",
   "priority": "LOW" | "MEDIUM" | "HIGH" | "URGENT",
+  "sentiment": "ANGRY" | "FRUSTRATED" | "NEUTRAL" | "CONFUSED" | "POSITIVE",
+  "sentimentScore": number between -1.0 (extremely negative/angry) and 1.0 (extremely positive),
+  "urgencyKeywords": ["array", "of", "phrases", "signaling", "urgency", "or", "risk"],
   "autoResolvable": boolean,
   "autoReply": "Clear, helpful customer response addressing their issue"
 }
 
 Provide a helpful, polite customer response in "autoReply" for ALL support requests.
 Only set autoResolvable true for simple, low-risk requests like password reset instructions, simple login help, or business hours. For complex billing, technical bugs, or custom questions, set autoResolvable false so human agents can review while the customer receives your helpful initial response.
+
+IMPORTANT SENTIMENT RULE:
+If the customer expresses strong anger, outrage, or severe dissatisfaction about a broken/damaged product, failed delivery, overcharge, or poor service (e.g., "extremely upset", "worst service ever", "cracked screen", "money back immediately", "demand a refund"), classify sentiment as "ANGRY" with sentimentScore <= -0.8 and extract urgency phrases (e.g. ["cracked screen", "money back immediately", "worst service"]).
+Do NOT lower the anger rating or score the message as POSITIVE/NEUTRAL just because the customer included polite side-notes, thanks, or compliments to individual support agents.
 
 Subject: ${subject}
 Description: ${description}`;
@@ -121,10 +214,29 @@ Description: ${description}`;
         : `Ticket regarding ${subject}`;
     const category = typeof parsed.category === 'string' ? parsed.category : 'Other';
     const priority = typeof parsed.priority === 'string' ? parsed.priority : Priority.MEDIUM;
+    const sentimentStr = typeof parsed.sentiment === 'string' ? parsed.sentiment.toUpperCase() : 'NEUTRAL';
+    const sentiment = allowedSentiments.has(sentimentStr as Sentiment) ? (sentimentStr as Sentiment) : Sentiment.NEUTRAL;
+    
+    let sentimentScore = typeof parsed.sentimentScore === 'number' ? parsed.sentimentScore : 0.0;
+    if (isNaN(sentimentScore)) sentimentScore = 0.0;
+    sentimentScore = Math.max(-1.0, Math.min(1.0, sentimentScore));
+
+    const urgencyKeywords = Array.isArray(parsed.urgencyKeywords)
+      ? parsed.urgencyKeywords.filter((kw): kw is string => typeof kw === 'string' && kw.trim().length > 0)
+      : [];
+
     const autoReply =
       typeof parsed.autoReply === 'string' && parsed.autoReply.trim()
         ? parsed.autoReply.trim()
         : `Thank you for contacting support regarding "${subject}". We have received your request and are reviewing it.`;
+
+    // Run VADER locally as a validation layer (~1-2ms, zero API cost)
+    const vaderResult = analyzeWithVader(`${subject} ${description}`);
+    const reconciled = reconcileSentiment(sentiment, sentimentScore, vaderResult);
+
+    console.log(
+      `[Sentiment] LLM: ${sentiment}(${sentimentScore}) | VADER: ${vaderResult.sentiment}(${vaderResult.sentimentScore}, ${vaderResult.confidence}) | Final: ${reconciled.sentiment}(${reconciled.sentimentScore}) via ${reconciled.source}`,
+    );
 
     return {
       summary,
@@ -132,6 +244,9 @@ Description: ${description}`;
       priority: allowedPriorities.has(priority as Priority)
         ? (priority as Priority)
         : Priority.MEDIUM,
+      sentiment: reconciled.sentiment,
+      sentimentScore: reconciled.sentimentScore,
+      urgencyKeywords,
       autoResolvable: parsed.autoResolvable === true,
       autoReply,
     };
@@ -199,8 +314,44 @@ function fallbackPolishReply(draft: string): string {
 
 export async function enrichTicketWithAi(ticketId: string, subject: string, description: string) {
   try {
+    const existingTicket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        customer: true,
+        replies: {
+          where: { isInternal: false },
+          include: { author: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
     const analysis = await analyzeTicketWithAi(subject, description);
     const aiUser = await ensureAiAssistantUser();
+
+    // Gather previous customer replies sentiment trend
+    const customerReplies = (existingTicket?.replies ?? [])
+      .filter((r) => r.author.role === Role.CUSTOMER)
+      .map((r) => ({
+        sentiment: r.sentiment,
+        sentimentScore: r.sentimentScore,
+      }));
+
+    const scoring = calculateAutoPriority({
+      sentiment: analysis.sentiment,
+      sentimentScore: analysis.sentimentScore,
+      urgencyKeywords: analysis.urgencyKeywords,
+      category: analysis.category,
+      customerTier: existingTicket?.customer?.tier ?? CustomerTier.STANDARD,
+      previousCustomerReplies: customerReplies,
+    });
+
+    console.log(
+      `\n🎯 [AI ENRICHMENT] Ticket: "${subject}"\n` +
+      `   LLM → sentiment: ${analysis.sentiment}(${analysis.sentimentScore}), priority: ${analysis.priority}, keywords: [${analysis.urgencyKeywords.join(', ')}]\n` +
+      `   Scoring → ${scoring.aiReasoning} (score: ${scoring.totalScore})\n` +
+      `   ✅ WRITING priority=${scoring.autoPriority} to DB\n`,
+    );
 
     const replyBody = `${analysis.autoReply}\n\nThis response was generated by AI Support. Reply to this email if you need further help.`;
 
@@ -214,7 +365,13 @@ export async function enrichTicketWithAi(ticketId: string, subject: string, desc
         data: {
           aiSummary: analysis.summary,
           category: analysis.category,
+          priority: scoring.autoPriority,
           aiSuggestedPriority: analysis.priority,
+          sentiment: analysis.sentiment,
+          sentimentScore: analysis.sentimentScore,
+          urgencyKeywords: analysis.urgencyKeywords,
+          autoPriority: scoring.autoPriority,
+          aiReasoning: scoring.aiReasoning,
           status: analysis.autoResolvable ? TicketStatus.AUTO_RESOLVED : undefined,
           resolvedAt: analysis.autoResolvable ? new Date() : undefined,
         },
@@ -230,6 +387,8 @@ export async function enrichTicketWithAi(ticketId: string, subject: string, desc
           ticketId,
           authorId: aiUser.id,
           body: replyBody,
+          sentiment: analysis.sentiment,
+          sentimentScore: analysis.sentimentScore,
         },
       });
       await tx.auditEvent.create({
@@ -258,7 +417,7 @@ export async function enrichTicketWithAi(ticketId: string, subject: string, desc
   }
 }
 
-async function ensureAiAssistantUser() {
+export async function ensureAiAssistantUser() {
   const email = 'ai-assistant@aiticketing.local';
   const existing = await prisma.user.findUnique({
     where: {

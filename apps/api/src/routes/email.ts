@@ -243,6 +243,8 @@ const inboundWebhookHandler = async (
         },
       });
 
+      void enrichTicketWithAi(existingTicket.id, existingTicket.subject, inboundEmail.text);
+
       response.status(200).json({
         action: 'replied',
         ticketId: existingTicket.id,

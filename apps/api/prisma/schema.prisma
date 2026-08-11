@@ -16,6 +16,7 @@ model User {
   isActive        Boolean      @default(true)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+  tier            CustomerTier @default(STANDARD)
   tickets         Ticket[]     @relation("CustomerTickets")
   assignedTickets Ticket[]     @relation("AgentTickets")
   replies         Reply[]
@@ -28,15 +29,34 @@ enum Role {
   ADMIN
 }
 
+enum CustomerTier {
+  STANDARD
+  PRO
+  ENTERPRISE
+}
+
+enum Sentiment {
+  ANGRY
+  FRUSTRATED
+  NEUTRAL
+  CONFUSED
+  POSITIVE
+}
+
 model Ticket {
   id                  String       @id @default(cuid())
   subject             String
   description         String
   status              TicketStatus @default(OPEN)
   priority            Priority     @default(MEDIUM)
+  autoPriority        Priority?
   category            String?
   aiSummary           String?
   aiSuggestedPriority Priority?
+  sentiment           Sentiment?
+  sentimentScore      Float?
+  urgencyKeywords     String[]
+  aiReasoning         String?
   customerId          String
   customer            User         @relation("CustomerTickets", fields: [customerId], references: [id])
   agentId             String?
@@ -72,15 +92,17 @@ enum Priority {
 }
 
 model Reply {
-  id         String   @id @default(cuid())
-  ticketId   String
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  authorId   String
-  author     User     @relation(fields: [authorId], references: [id])
-  body       String
-  isAiDraft  Boolean  @default(false)
-  isInternal Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id             String     @id @default(cuid())
+  ticketId       String
+  ticket         Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User       @relation(fields: [authorId], references: [id])
+  body           String
+  isAiDraft      Boolean    @default(false)
+  isInternal     Boolean    @default(false)
+  sentiment      Sentiment?
+  sentimentScore Float?
+  createdAt      DateTime   @default(now())
 
   @@index([ticketId])
   @@index([authorId])
